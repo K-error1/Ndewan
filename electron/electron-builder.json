@@ -1,0 +1,51 @@
+{
+  "appId": "com.NdewanEnterprice.inventory",
+  "productName": "Ndewan Enterprice",
+  "copyright": "Copyright © 2026 Ndewan Enterprice",
+  "directories": {
+    "output": "release"
+  },
+  "files": [
+    "dist/**/*",
+    "electron/**/*",
+    "node_modules/**/*",
+    "package.json"
+  ],
+  "asar": true,
+  "asarUnpack": [
+    "node_modules/better-sqlite3/**/*",
+    "node_modules/bindings/**/*",
+    "node_modules/file-uri-to-path/**/*"
+  ],
+  "win": {
+    "target": [
+      {
+        "target": "nsis",
+        "arch": [
+          "x64"
+        ]
+      }
+    ],
+    "icon": "assets/icon.ico"
+  },
+  "nsis": {
+    "oneClick": false,
+    "allowToChangeInstallationDirectory": true,
+    "installerIcon": "assets/icon.ico",
+    "uninstallerIcon": "assets/icon.ico",
+    "installerHeaderIcon": "assets/icon.ico",
+    "createDesktopShortcut": true,
+    "createStartMenuShortcut": true,
+    "shortcutName": "StockMaster"
+  },
+  "mac": {
+    "target": "dmg",
+    "icon": "assets/icon.icns",
+    "category": "public.app-category.business"
+  },
+  "linux": {
+    "target": "AppImage",
+    "icon": "assets/icon.png",
+    "category": "Office"
+  }
+}
