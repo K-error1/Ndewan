@@ -62,6 +62,7 @@ export interface Sale {
   id:             number;
   total_amount:   number;
   payment_method: string;
+  mpesa_code?:    string;
   customer_name?: string;
   notes?:         string;
   created_at:     string;

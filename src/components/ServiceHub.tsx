@@ -15,8 +15,9 @@ import {
   Plus,
   Minus,
   RotateCcw,
-  ChevronRight,
   Clock,
+  ChevronRight,
+  Zap
 } from 'lucide-react';
 import { useToast } from '@/components/ui/Toast';
 import { cn } from '@/utils/cn';
@@ -101,6 +102,8 @@ export function ServiceHub({ onGoToCatalog }: ServiceHubProps) {
   const [customDesc, setCustomDesc] = useState('');
   const [jobModal, setJobModal] = useState<ServiceItem | null>(null);
   const [customerName, setCustomerName] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState<'Cash' | 'M-Pesa'>('Cash');
+  const [mpesaCode, setMpesaCode] = useState('');
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   const filteredServices = dynamicServices.filter(s => s.category === selectedCategory);
@@ -121,6 +124,7 @@ export function ServiceHub({ onGoToCatalog }: ServiceHubProps) {
       return;
     }
 
+    console.log('Logging service:', service.label, 'Qty:', qty, 'Total:', total);
     setLoadingId(service.id);
     try {
       if (asJob) {
@@ -136,25 +140,36 @@ export function ServiceHub({ onGoToCatalog }: ServiceHubProps) {
         setRefreshTrigger(prev => prev + 1);
       } else {
         // Direct sale (done immediately)
-        await db.sales.create({
-          sale: { total_amount: total, payment_method: 'Cash', notes: service.label },
-          items: [{ product_id: 0, quantity: qty, unit_price: service.defaultPrice, unit_buying_price: 0 }] // Dummy ID for non-inventory
+        const res = await db.sales.create({
+          sale: { 
+            total_amount: total, 
+            payment_method: paymentMethod, 
+            mpesa_code: paymentMethod === 'M-Pesa' ? mpesaCode.toUpperCase() : undefined,
+            notes: service.label 
+          },
+          items: [{ product_id: 0, quantity: qty, unit_price: service.defaultPrice, unit_buying_price: 0 }] 
         });
-        setSessionRevenue(prev => prev + total);
-        toast(`✅ ${service.label} logged — KSH ${total.toLocaleString('en-KE')}`, 'success');
-        
-        // Auto-print receipt if settings allow (or just offer it)
-        const receipt: ReceiptData = {
-          shopName: settings.shop_name || 'Ndewan Enterprices',
-          address: settings.shop_address || 'Nairobi',
-          phone: settings.shop_phone || '',
-          till: settings.mpesa_till || '',
-          items: [{ name: service.label, qty, price: service.defaultPrice }],
-          total,
-          cashier: 'Staff', // ideally from auth context
-          footer: settings.receipt_footer || 'Thank you!'
-        };
-        printReceipt(receipt);
+
+        if (res.success) {
+          setSessionRevenue(prev => prev + total);
+          toast(`✅ ${service.label} logged — KSH ${total.toLocaleString('en-KE')}`, 'success');
+          
+          const receipt: any = {
+            shopName: settings.shop_name || 'Ndewan Enterprises',
+            address: settings.shop_address || 'Nairobi',
+            phone: settings.shop_phone || '',
+            till: settings.mpesa_till || '',
+            items: [{ name: service.label, qty, price: service.defaultPrice }],
+            total,
+            cashier: 'Staff',
+            footer: settings.receipt_footer || 'Thank you!'
+          };
+          window.alert(`Logged: ${service.label} - KSH ${total}`);
+          // printReceipt(receipt);
+          if (paymentMethod === 'M-Pesa') setMpesaCode('');
+        } else {
+          throw new Error(res.error || 'Failed to log sale in database');
+        }
       }
       setQuantities(prev => ({ ...prev, [service.id]: 1 }));
     } catch (err: any) {
@@ -178,7 +193,7 @@ export function ServiceHub({ onGoToCatalog }: ServiceHubProps) {
     <div className="max-w-5xl mx-auto space-y-8 animate-in">
 
       {/* ── Header ──────────────────────────────────────────────────────────── */}
-      <div className="flex items-center justify-between flex-wrap gap-4">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div>
           <h1 className="text-4xl font-bold text-white tracking-tight">Service Desk</h1>
           <p className="text-slate-400 text-sm mt-1 flex items-center gap-2">
@@ -186,6 +201,37 @@ export function ServiceHub({ onGoToCatalog }: ServiceHubProps) {
             Staff operations — log services instantly
           </p>
         </div>
+
+        <div className="flex items-center gap-3 p-1.5 bg-white/5 rounded-2xl border border-white/5">
+          <button 
+            onClick={() => setPaymentMethod('Cash')}
+            className={cn(
+              "px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all",
+              paymentMethod === 'Cash' ? "bg-white/10 text-white shadow-lg" : "text-slate-500 hover:text-slate-300"
+            )}
+          >
+            Cash
+          </button>
+          <button 
+            onClick={() => setPaymentMethod('M-Pesa')}
+            className={cn(
+              "px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all",
+              paymentMethod === 'M-Pesa' ? "bg-indigo-500 text-white shadow-lg shadow-indigo-900/40" : "text-slate-500 hover:text-slate-300"
+            )}
+          >
+            M-Pesa
+          </button>
+          {paymentMethod === 'M-Pesa' && (
+            <input 
+              type="text"
+              placeholder="Code..."
+              value={mpesaCode}
+              onChange={e => setMpesaCode(e.target.value.toUpperCase())}
+              className="bg-black/20 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:ring-1 focus:ring-indigo-500 w-24"
+            />
+          )}
+        </div>
+
         <div className="glass-panel px-5 py-3 rounded-2xl border border-white/5 text-right">
           <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Session Revenue</p>
           <p className="text-2xl font-black text-emerald-400 tabular-nums">
@@ -284,7 +330,6 @@ export function ServiceHub({ onGoToCatalog }: ServiceHubProps) {
               <div className="flex flex-col gap-2">
                 <button
                   onClick={() => handleLogService(service, false)}
-                  disabled={isAnyLoading}
                   className={cn(
                     'w-full flex items-center justify-between rounded-xl px-4 py-3 font-bold text-sm transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed',
                     'bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-900/20'
@@ -299,7 +344,6 @@ export function ServiceHub({ onGoToCatalog }: ServiceHubProps) {
                 {service.category === 'cyber' && (
                   <button
                     onClick={() => handleLogService(service, true)}
-                    disabled={isAnyLoading}
                     className="w-full flex items-center justify-center gap-2 rounded-xl border border-purple-500/30 hover:border-purple-500/60 bg-purple-500/5 text-purple-400 py-2.5 font-bold text-xs uppercase tracking-widest transition-all active:scale-95"
                   >
                     <Clock size={12} />

@@ -47,6 +47,7 @@ import { LiveClock } from '@/components/LiveClock';
 import { ExpenseManager } from '@/components/ExpenseManager';
 import { SettingsManager } from '@/components/SettingsManager';
 import { ReportsDashboard } from '@/components/ReportsDashboard';
+import { POS } from '@/components/POS';
 import { LoginOverlay } from '@/components/LoginOverlay';
 import { db, Product, ProductInput, Stats, ActivityLog as LogEntry, User, isRunningInElectron } from '@/lib/db';
 import { Input } from '@/components/ui/Input';
@@ -56,7 +57,7 @@ import { cn } from '@/utils/cn';
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type Tab = 'dashboard' | 'products' | 'lowstock' | 'activity' | 'servicedesk' | 'expenses' | 'settings' | 'reports';
-type Role = 'admin' | 'employee';
+type Role = 'admin' | 'cashier';
 
 // ─── Sidebar nav items ────────────────────────────────────────────────────────
 
@@ -78,7 +79,7 @@ function AppInner() {
 
   // ── Auth ───────────────────────────────────────────────────────────────────
   const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [role, setRole] = useState<Role>('employee');
+  const [role, setRole] = useState<Role>('cashier');
 
   // ── Navigation ──────────────────────────────────────────────────────────────
   const [tab, setTab]   = useState<Tab>('dashboard');
@@ -254,7 +255,7 @@ function AppInner() {
 
   const handleLogin = (user: User) => {
     setCurrentUser(user);
-    setRole(user.role === 'admin' ? 'admin' : 'employee');
+    setRole(user.role === 'admin' ? 'admin' : 'cashier');
     setTab(user.role === 'admin' ? 'dashboard' : 'servicedesk');
   };
 
@@ -318,9 +319,9 @@ function AppInner() {
             const Icon = item.icon;
             const badge = item.id === 'lowstock' && lowStock.length > 0 ? lowStock.length : null;
             
-            // Admins cannot see Service Desk; employees cannot see Audit Log/Expenses/Settings/Reports
+            // Admins cannot see Service Desk; cashiers cannot see Audit Log/Expenses/Settings/Reports
             if (role === 'admin'    && item.id === 'servicedesk') return null;
-            if (role === 'employee' && ['activity', 'expenses', 'settings', 'reports'].includes(item.id)) return null;
+            if (role === 'cashier' && ['activity', 'expenses', 'settings', 'reports'].includes(item.id)) return null;
 
             return (
               <button

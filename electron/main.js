@@ -123,7 +123,7 @@ function initDatabase() {
     );
   `);
   
-  // ── Sales tables ────────────────────────────────────────────────────────────
+    // ── Sales tables ────────────────────────────────────────────────────────────
   db.exec(`
     CREATE TABLE IF NOT EXISTS sales (
       id             INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -143,6 +143,16 @@ function initDatabase() {
       unit_buying_price REAL NOT NULL
     );
   `);
+
+  // Safe migration for sales table
+  try {
+    const saleCols = db.prepare('PRAGMA table_info(sales)').all().map(c => c.name);
+    if (!saleCols.includes('mpesa_code')) {
+      db.exec(`ALTER TABLE sales ADD COLUMN mpesa_code TEXT`);
+    }
+  } catch (err) {
+    console.error('[DB] Sales migration failed:', err.message);
+  }
 
   // ── Expenses table ──────────────────────────────────────────────────────────
   db.exec(`
@@ -251,6 +261,12 @@ function initDatabase() {
       { key: 'price_passport_photo', value: '200' },
       { key: 'price_id_photo', value: '150' },
     ];
+    // ── Seed placeholder for services (ID 0) ──
+    db.prepare(`
+      INSERT OR IGNORE INTO products (id, name, category, price, buying_price, quantity, description, sku, barcode, location)
+      VALUES (0, 'Service Item', 'Service', 0, 0, 0, 'Internal placeholder for services', 'SERVICE-0', 'SERVICE-0', 'Digital')
+    `).run();
+
     const insertSetting = db.prepare('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)');
     for (const s of defaultSettings) insertSetting.run(s.key, s.value);
   } catch (err) {
@@ -330,8 +346,8 @@ function prepareStatements() {
     `),
     // ── Sales Statements ──
     insertSale: db.prepare(`
-      INSERT INTO sales (total_amount, payment_method, customer_name, notes)
-      VALUES (@total_amount, @payment_method, @customer_name, @notes)
+      INSERT INTO sales (total_amount, payment_method, customer_name, notes, mpesa_code)
+      VALUES (@total_amount, @payment_method, @customer_name, @notes, @mpesa_code)
     `),
     insertSaleItem: db.prepare(`
       INSERT INTO sale_items (sale_id, product_id, quantity, unit_price, unit_buying_price)
